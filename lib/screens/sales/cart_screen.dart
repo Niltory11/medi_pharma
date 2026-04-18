@@ -78,7 +78,6 @@ class CartScreen extends StatelessWidget {
             ),
           ),
 
-          // Total & Checkout
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
@@ -108,51 +107,65 @@ class CartScreen extends StatelessWidget {
                 CustomButton(
                   label: 'Checkout & Print Receipt',
                   onPressed: () async {
-                    // ✅ Step 1 — Deep snapshot as raw maps
-                    // completely independent of cart state
-                    final snapshot = cart.cart
-                        .map((item) => {
-                      'id': item.medicine.id,
-                      'name': item.medicine.name,
-                      'price': item.medicine.price,
-                      'quantity': item.quantity,
-                      'total': item.total,
-                    })
+                    // ✅ Freeze ALL data into local variables first
+                    // before ANY async operation or cart modification
+                    final frozenIds = cart.cart
+                        .map((i) => i.medicine.id)
                         .toList();
-
+                    final frozenQtys = cart.cart
+                        .map((i) => i.quantity)
+                        .toList();
+                    final frozenNames = cart.cart
+                        .map((i) => i.medicine.name)
+                        .toList();
+                    final frozenPrices = cart.cart
+                        .map((i) => i.medicine.price)
+                        .toList();
+                    final frozenTotals = cart.cart
+                        .map((i) => i.total)
+                        .toList();
                     final total = cart.cartTotal;
                     final soldBy = user?.username ?? 'staff';
 
-                    debugPrint(
-                        '🛒 Snapshot: ${snapshot.length} items, Total: $total');
+                    debugPrint('🛒 Frozen ${frozenIds.length} items, Total: $total');
 
-                    // ✅ Step 2 — Save sale to Firestore
+                    // ✅ Step 1 — Save sale to Firestore
                     await cart.checkout(soldBy);
                     debugPrint('✅ Sale saved');
 
-                    // ✅ Step 3 — Deduct inventory using snapshot
+                    // ✅ Step 2 — Deduct inventory using frozen data
                     final firestore = FirebaseFirestore.instance;
-                    for (final item in snapshot) {
-                      final medicineId = item['id'] as String;
-                      final qty = item['quantity'] as int;
-                      final name = item['name'] as String;
+                    for (int i = 0; i < frozenIds.length; i++) {
+                      debugPrint('⚡ Deducting ${frozenQtys[i]} from ${frozenNames[i]}');
                       try {
                         await firestore
                             .collection('medicines')
-                            .doc(medicineId)
+                            .doc(frozenIds[i])
                             .update({
-                          'quantity': FieldValue.increment(-qty),
+                          'quantity': FieldValue.increment(-frozenQtys[i]),
                         });
-                        debugPrint('✅ Deducted $qty from $name');
+                        debugPrint('✅ Done: ${frozenNames[i]}');
                       } catch (e) {
-                        debugPrint('❌ Failed to deduct $name: $e');
+                        debugPrint('❌ Failed: ${frozenNames[i]}: $e');
                       }
                     }
 
-                    // ✅ Step 4 — Generate PDF receipt
+                    // ✅ Step 3 — Build PDF snapshot from frozen data
+                    final pdfSnapshot = List.generate(
+                      frozenIds.length,
+                          (i) => {
+                        'id': frozenIds[i],
+                        'name': frozenNames[i],
+                        'price': frozenPrices[i],
+                        'quantity': frozenQtys[i],
+                        'total': frozenTotals[i],
+                      },
+                    );
+
+                    // ✅ Step 4 — Generate PDF & go back
                     if (context.mounted) {
                       await PdfUtils.generateReceipt(
-                          snapshot, total, soldBy);
+                          pdfSnapshot, total, soldBy);
                       Navigator.pop(context);
                     }
                   },
