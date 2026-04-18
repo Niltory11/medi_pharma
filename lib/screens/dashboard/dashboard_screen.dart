@@ -78,7 +78,7 @@ class _DashboardHome extends StatelessWidget {
 
     final now = DateTime.now();
 
-    // ✅ Fixed today's sales filter and revenue
+
     final todaySales = salesProvider.sales.where((s) =>
     s.date.year == now.year &&
         s.date.month == now.month &&
