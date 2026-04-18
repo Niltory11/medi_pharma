@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/sales_provider.dart';
 import '../../core/constants/app_colors.dart';
@@ -35,8 +36,7 @@ class CartScreen extends StatelessWidget {
                 size: 80, color: Colors.grey),
             SizedBox(height: 12),
             Text('Cart is empty',
-                style:
-                TextStyle(color: Colors.grey, fontSize: 16)),
+                style: TextStyle(color: Colors.grey, fontSize: 16)),
           ],
         ),
       )
@@ -67,8 +67,8 @@ class CartScreen extends StatelessWidget {
                         IconButton(
                           icon: const Icon(Icons.delete,
                               color: AppColors.danger),
-                          onPressed: () => cart
-                              .removeFromCart(item.medicine.id),
+                          onPressed: () =>
+                              cart.removeFromCart(item.medicine.id),
                         ),
                       ],
                     ),
@@ -90,8 +90,7 @@ class CartScreen extends StatelessWidget {
             child: Column(
               children: [
                 Row(
-                  mainAxisAlignment:
-                  MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('Total:',
                         style: TextStyle(
@@ -109,18 +108,51 @@ class CartScreen extends StatelessWidget {
                 CustomButton(
                   label: 'Checkout & Print Receipt',
                   onPressed: () async {
-                    // Snapshot cart before clearing
-                    final cartItems = List.from(cart.cart);
+                    // ✅ Step 1 — Deep snapshot as raw maps
+                    // completely independent of cart state
+                    final snapshot = cart.cart
+                        .map((item) => {
+                      'id': item.medicine.id,
+                      'name': item.medicine.name,
+                      'price': item.medicine.price,
+                      'quantity': item.quantity,
+                      'total': item.total,
+                    })
+                        .toList();
+
                     final total = cart.cartTotal;
                     final soldBy = user?.username ?? 'staff';
 
-                    // Checkout (saves sale + deducts qty)
-                    await cart.checkout(soldBy);
+                    debugPrint(
+                        '🛒 Snapshot: ${snapshot.length} items, Total: $total');
 
+                    // ✅ Step 2 — Save sale to Firestore
+                    await cart.checkout(soldBy);
+                    debugPrint('✅ Sale saved');
+
+                    // ✅ Step 3 — Deduct inventory using snapshot
+                    final firestore = FirebaseFirestore.instance;
+                    for (final item in snapshot) {
+                      final medicineId = item['id'] as String;
+                      final qty = item['quantity'] as int;
+                      final name = item['name'] as String;
+                      try {
+                        await firestore
+                            .collection('medicines')
+                            .doc(medicineId)
+                            .update({
+                          'quantity': FieldValue.increment(-qty),
+                        });
+                        debugPrint('✅ Deducted $qty from $name');
+                      } catch (e) {
+                        debugPrint('❌ Failed to deduct $name: $e');
+                      }
+                    }
+
+                    // ✅ Step 4 — Generate PDF receipt
                     if (context.mounted) {
-                      // Generate PDF after checkout
                       await PdfUtils.generateReceipt(
-                          cartItems, total, soldBy);
+                          snapshot, total, soldBy);
                       Navigator.pop(context);
                     }
                   },

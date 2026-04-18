@@ -10,7 +10,7 @@ import '../auth/login_screen.dart';
 import '../inventory/inventory_screen.dart';
 import '../sales/sales_screen.dart';
 import '../expiry/expiry_tracker_screen.dart';
-import '../reports/report_screen.dart';
+import '../../screens/reports/report_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -73,18 +73,23 @@ class _DashboardHome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final medicines = context.watch<MedicineProvider>();
-    final sales = context.watch<SalesProvider>();
+    final salesProvider = context.watch<SalesProvider>();
     final user = context.watch<AuthProvider>().user;
 
-    final todaySales = sales.sales.where((s) {
-      final now = DateTime.now();
-      return s.date.year == now.year &&
-          s.date.month == now.month &&
-          s.date.day == now.day;
-    }).toList();
+    final now = DateTime.now();
 
-    final todayRevenue =
-    todaySales.fold<double>(0, (sum, s) => sum + s.grandTotal);
+    // ✅ Fixed today's sales filter and revenue
+    final todaySales = salesProvider.sales.where((s) =>
+    s.date.year == now.year &&
+        s.date.month == now.month &&
+        s.date.day == now.day).toList();
+
+    final todayRevenue = todaySales.fold<double>(
+        0, (sum, s) => sum + s.grandTotal);
+
+    debugPrint('📊 Total sales loaded: ${salesProvider.sales.length}');
+    debugPrint('📊 Today sales: ${todaySales.length}');
+    debugPrint('📊 Today revenue: $todayRevenue');
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -93,10 +98,11 @@ class _DashboardHome extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Dashboard',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Text('Welcome, ${user?.username ?? ''}',
                 style:
-                const TextStyle(fontSize: 12, fontWeight: FontWeight.w300)),
+                TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('Welcome, ${user?.username ?? ''}',
+                style: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w300)),
           ],
         ),
         actions: [
@@ -104,8 +110,10 @@ class _DashboardHome extends StatelessWidget {
             icon: const Icon(Icons.logout),
             onPressed: () {
               context.read<AuthProvider>().logout();
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()));
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const LoginScreen()));
             },
           )
         ],
@@ -115,7 +123,6 @@ class _DashboardHome extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Stat Cards
             GridView.count(
               crossAxisCount: 2,
               crossAxisSpacing: 12,
@@ -127,7 +134,7 @@ class _DashboardHome extends StatelessWidget {
                 StatCard(
                   title: 'Total Medicines',
                   value: '${medicines.medicines.length}',
-                  icon: Icons.medication,
+                  icon: Icons.medication_liquid,
                   color: AppColors.primary,
                 ),
                 StatCard(
@@ -144,8 +151,8 @@ class _DashboardHome extends StatelessWidget {
                 ),
                 StatCard(
                   title: "Today's Revenue",
-                  value: '৳${todayRevenue.toStringAsFixed(0)}',
-                  icon: Icons.attach_money,
+                  value: 'BDT ${todayRevenue.toStringAsFixed(0)}',
+                  icon: Icons.monetization_on,
                   color: AppColors.secondary,
                 ),
               ],
@@ -153,17 +160,18 @@ class _DashboardHome extends StatelessWidget {
 
             const SizedBox(height: 24),
 
-            // Low Stock Section
             const Text('Low Stock Medicines',
-                style:
-                TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
+
             medicines.lowStock.isEmpty
                 ? const Card(
               child: ListTile(
                 leading: Icon(Icons.check_circle,
                     color: AppColors.secondary),
-                title: Text('All medicines are well stocked'),
+                title:
+                Text('All medicines are well stocked'),
               ),
             )
                 : Column(

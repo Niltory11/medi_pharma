@@ -2,11 +2,16 @@ import 'medicine_model.dart';
 
 class SaleItem {
   final Medicine medicine;
-  int quantity;
+  final int quantity;
+  final double itemTotal;
 
-  SaleItem({required this.medicine, required this.quantity});
+  SaleItem({
+    required this.medicine,
+    required this.quantity,
+    required this.itemTotal,
+  });
 
-  double get total => medicine.price * quantity;
+  double get total => itemTotal;
 
   Map<String, dynamic> toMap() {
     return {
@@ -14,7 +19,7 @@ class SaleItem {
       'medicineName': medicine.name,
       'price': medicine.price,
       'quantity': quantity,
-      'total': total,
+      'total': itemTotal,
     };
   }
 }

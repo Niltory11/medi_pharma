@@ -5,15 +5,17 @@ class Sale {
   final List<SaleItem> items;
   final DateTime date;
   final String soldBy;
+  final double storedTotal;
 
   Sale({
     required this.id,
     required this.items,
     required this.date,
     required this.soldBy,
+    required this.storedTotal,
   });
 
-  double get grandTotal => items.fold(0, (sum, item) => sum + item.total);
+  double get grandTotal => storedTotal;
 
   Map<String, dynamic> toMap() {
     return {
@@ -21,7 +23,7 @@ class Sale {
       'items': items.map((e) => e.toMap()).toList(),
       'date': date.toIso8601String(),
       'soldBy': soldBy,
-      'grandTotal': grandTotal,
+      'grandTotal': storedTotal,
     };
   }
 }
