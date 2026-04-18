@@ -120,7 +120,7 @@ class _SellMedicineCard extends StatelessWidget {
               onPressed: medicine.quantity == 0 || medicine.isExpired
                   ? null
                   : () => _showQtyDialog(context),
-              child: const Text('Add',
+              child: const Text('Sell',
                   style: TextStyle(color: Colors.white, fontSize: 13)),
             ),
           ],
