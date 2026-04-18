@@ -45,14 +45,7 @@ class AuthWrapper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
-
-    if (authProvider.isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    return authProvider.user != null
+    return authProvider.isLoggedIn
         ? const DashboardScreen()
         : const LoginScreen();
   }

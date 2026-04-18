@@ -2,47 +2,40 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/sales_provider.dart';
-import '../../models/sale_item_model.dart';
+import '../../core/constants/app_colors.dart';
 import '../../widgets/common/custom_button.dart';
+import '../../core/utils/pdf_utils.dart';
 
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final salesProv = context.watch<SalesProvider>();
-    final cart = salesProv.cart;
-    final user = context.read<AuthProvider>().user;
+    final cart = context.watch<SalesProvider>();
+    final user = context.watch<AuthProvider>().user;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Cart', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Cart'),
         actions: [
-          if (cart.isNotEmpty)
+          if (cart.cart.isNotEmpty)
             TextButton(
-              onPressed: () => salesProv.clearCart(),
-              child: const Text('Clear', style: TextStyle(color: Colors.red)),
-            ),
+              onPressed: () => cart.clearCart(),
+              child: const Text('Clear',
+                  style: TextStyle(color: Colors.white)),
+            )
         ],
       ),
-      body: cart.isEmpty
-          ? Center(
+      body: cart.cart.isEmpty
+          ? const Center(
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.shopping_cart_outlined,
-                size: 72,
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurfaceVariant
-                    .withOpacity(0.4)),
-            const SizedBox(height: 12),
-            Text('Your cart is empty',
-                style: TextStyle(
-                    fontSize: 16,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurfaceVariant)),
+                size: 80, color: Colors.grey),
+            SizedBox(height: 12),
+            Text('Cart is empty',
+                style: TextStyle(color: Colors.grey, fontSize: 16)),
           ],
         ),
       )
@@ -50,151 +43,82 @@ class CartScreen extends StatelessWidget {
         children: [
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: cart.length,
-              itemBuilder: (_, i) => _CartItemCard(item: cart[i]),
+              padding: const EdgeInsets.all(12),
+              itemCount: cart.cart.length,
+              itemBuilder: (_, i) {
+                final item = cart.cart[i];
+                return Card(
+                  child: ListTile(
+                    title: Text(item.medicine.name,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600)),
+                    subtitle: Text(
+                        '৳${item.medicine.price.toStringAsFixed(2)} × ${item.quantity}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                            '৳${item.total.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary)),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.delete,
+                              color: AppColors.danger),
+                          onPressed: () => cart
+                              .removeFromCart(item.medicine.id),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
-          _CheckoutBar(
-            total: salesProv.cartTotal,
-            onCheckout: () => _checkout(context, user?.username ?? 'unknown'),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Future<void> _checkout(BuildContext context, String soldBy) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Confirm Checkout'),
-        content: Text(
-            'Total: ₦${context.read<SalesProvider>().cartTotal.toStringAsFixed(2)}\n\nProceed with sale?'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
-          ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Confirm')),
-        ],
-      ),
-    );
-
-    if (confirmed == true && context.mounted) {
-      await context.read<SalesProvider>().checkout(soldBy);
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Sale completed successfully!'),
-            backgroundColor: Colors.green),
-      );
-    }
-  }
-}
-
-class _CartItemCard extends StatelessWidget {
-  final SaleItem item;
-  const _CartItemCard({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: scheme.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(Icons.medication, color: scheme.primary),
+          // Total & Checkout
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(color: Colors.black12, blurRadius: 8)
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(item.medicine.name,
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
-                  Text(
-                      '₦${item.medicine.price.toStringAsFixed(2)} × ${item.quantity}',
-                      style: TextStyle(
-                          fontSize: 12, color: scheme.onSurfaceVariant)),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            child: Column(
               children: [
-                Text('₦${item.total.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 15)),
-                const SizedBox(height: 4),
-                InkWell(
-                  onTap: () => context
-                      .read<SalesProvider>()
-                      .removeFromCart(item.medicine.id),
-                  child:
-                  const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                Row(
+                  mainAxisAlignment:
+                  MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Total:',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold)),
+                    Text(
+                        '৳${cart.cartTotal.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                CustomButton(
+                  label: 'Checkout & Print Receipt',
+                  onPressed: () async {
+                    final items = List.from(cart.cart);
+                    final total = cart.cartTotal;
+                    await cart.checkout(user?.username ?? 'staff');
+                    if (context.mounted) {
+                      await PdfUtils.generateReceipt(
+                          items, total, user?.username ?? 'staff');
+                      Navigator.pop(context);
+                    }
+                  },
                 ),
               ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CheckoutBar extends StatelessWidget {
-  final double total;
-  final VoidCallback onCheckout;
-
-  const _CheckoutBar({required this.total, required this.onCheckout});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 12,
-              offset: const Offset(0, -4))
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Total',
-                    style: TextStyle(fontSize: 13, color: Colors.grey)),
-                Text('₦${total.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: CustomButton(
-              label: 'Checkout',
-              onPressed: onCheckout,
-              icon: Icons.payment,
             ),
           ),
         ],

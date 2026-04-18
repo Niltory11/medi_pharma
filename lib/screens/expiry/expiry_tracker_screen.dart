@@ -1,65 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/medicine_provider.dart';
-import '../../models/medicine_model.dart';
+import '../../core/constants/app_colors.dart';
 import '../../core/utils/date_utils.dart';
-import '../../widgets/common/loading_widget.dart';
+import '../../models/medicine_model.dart';
 
-class ExpiryTrackerScreen extends StatefulWidget {
+class ExpiryTrackerScreen extends StatelessWidget {
   const ExpiryTrackerScreen({super.key});
 
   @override
-  State<ExpiryTrackerScreen> createState() => _ExpiryTrackerScreenState();
-}
-
-class _ExpiryTrackerScreenState extends State<ExpiryTrackerScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tab;
-
-  @override
-  void initState() {
-    super.initState();
-    _tab = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tab.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final prov = context.watch<MedicineProvider>();
+    final provider = context.watch<MedicineProvider>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Expiry Tracker',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        bottom: TabBar(
-          controller: _tab,
-          tabs: [
-            Tab(text: 'Near Expiry (${prov.nearExpiry.length})'),
-            Tab(text: 'Expired (${prov.expired.length})'),
+      appBar: AppBar(title: const Text('Expiry Tracker')),
+      body: DefaultTabController(
+        length: 2,
+        child: Column(
+          children: [
+            const TabBar(
+              labelColor: AppColors.primary,
+              tabs: [
+                Tab(text: 'Near Expiry (30 days)'),
+                Tab(text: 'Expired'),
+              ],
+            ),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  _ExpiryList(
+                      medicines: provider.nearExpiry,
+                      color: AppColors.nearExpiry,
+                      emptyMsg: 'No near-expiry medicines 🎉'),
+                  _ExpiryList(
+                      medicines: provider.expired,
+                      color: AppColors.expired,
+                      emptyMsg: 'No expired medicines 🎉'),
+                ],
+              ),
+            ),
           ],
         ),
-      ),
-      body: prov.medicines.isEmpty
-          ? const LoadingWidget()
-          : TabBarView(
-        controller: _tab,
-        children: [
-          _ExpiryList(
-            medicines: prov.nearExpiry,
-            emptyMessage: 'No near-expiry medicines 🎉',
-            badgeColor: Colors.deepOrange,
-          ),
-          _ExpiryList(
-            medicines: prov.expired,
-            emptyMessage: 'No expired medicines 🎉',
-            badgeColor: Colors.red,
-          ),
-        ],
       ),
     );
   }
@@ -67,122 +48,53 @@ class _ExpiryTrackerScreenState extends State<ExpiryTrackerScreen>
 
 class _ExpiryList extends StatelessWidget {
   final List<Medicine> medicines;
-  final String emptyMessage;
-  final Color badgeColor;
+  final Color color;
+  final String emptyMsg;
 
-  const _ExpiryList({
-    required this.medicines,
-    required this.emptyMessage,
-    required this.badgeColor,
-  });
+  const _ExpiryList(
+      {required this.medicines,
+        required this.color,
+        required this.emptyMsg});
 
   @override
   Widget build(BuildContext context) {
     if (medicines.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.check_circle_outline,
-                size: 64, color: Colors.green.withOpacity(0.6)),
-            const SizedBox(height: 12),
-            Text(emptyMessage,
-                style: TextStyle(
-                    fontSize: 16,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          ],
-        ),
-      );
+          child: Text(emptyMsg,
+              style: const TextStyle(fontSize: 16, color: Colors.grey)));
     }
-
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       itemCount: medicines.length,
-      itemBuilder: (_, i) => _ExpiryCard(
-        medicine: medicines[i],
-        badgeColor: badgeColor,
-      ),
-    );
-  }
-}
-
-class _ExpiryCard extends StatelessWidget {
-  final Medicine medicine;
-  final Color badgeColor;
-
-  const _ExpiryCard({required this.medicine, required this.badgeColor});
-
-  @override
-  Widget build(BuildContext context) {
-    final daysLeft = AppDateUtils.daysUntilExpiry(medicine.expiryDate);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: badgeColor.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: badgeColor.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: badgeColor.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
+      itemBuilder: (_, i) {
+        final m = medicines[i];
+        final days = AppDateUtils.daysUntilExpiry(m.expiryDate);
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: color.withOpacity(0.15),
+              child: Icon(Icons.timer, color: color),
             ),
-            child: Icon(Icons.medication, color: badgeColor, size: 26),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(medicine.name,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 15)),
-                const SizedBox(height: 2),
-                Text(medicine.category,
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                const SizedBox(height: 6),
-                Text('Expires: ${AppDateUtils.format(medicine.expiryDate)}',
-                    style: TextStyle(fontSize: 12, color: badgeColor)),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: badgeColor,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  medicine.isExpired
-                      ? 'EXPIRED'
-                      : '$daysLeft days',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold),
-                ),
+            title: Text(m.name,
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(
+                '${m.category} • Exp: ${AppDateUtils.format(m.expiryDate)}'),
+            trailing: Container(
+              padding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20)),
+              child: Text(
+                days < 0 ? 'Expired' : '$days days',
+                style: TextStyle(
+                    color: color, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 4),
-              Text('Qty: ${medicine.quantity}',
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant)),
-            ],
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

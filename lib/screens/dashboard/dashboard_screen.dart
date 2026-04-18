@@ -3,14 +3,14 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/medicine_provider.dart';
 import '../../providers/sales_provider.dart';
+import '../../core/constants/app_colors.dart';
 import '../../widgets/dashboard/stat_card.dart';
 import '../../widgets/dashboard/low_stock_card.dart';
-import '../../widgets/common/loading_widget.dart';
+import '../auth/login_screen.dart';
 import '../inventory/inventory_screen.dart';
 import '../sales/sales_screen.dart';
 import '../expiry/expiry_tracker_screen.dart';
 import '../reports/report_screen.dart';
-import '../../screens/auth/login_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -22,41 +22,44 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = const [
+  final _screens = const [
     _DashboardHome(),
     InventoryScreen(),
     SalesScreen(),
     ExpiryTrackerScreen(),
-    ReportScreen(),
+    ReportsScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_currentIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (i) => setState(() => _currentIndex = i),
-        destinations: const [
-          NavigationDestination(
+      body: _screens[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (i) => setState(() => _currentIndex = i),
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: AppColors.textLight,
+        items: const [
+          BottomNavigationBarItem(
               icon: Icon(Icons.dashboard_outlined),
-              selectedIcon: Icon(Icons.dashboard),
+              activeIcon: Icon(Icons.dashboard),
               label: 'Dashboard'),
-          NavigationDestination(
+          BottomNavigationBarItem(
               icon: Icon(Icons.inventory_2_outlined),
-              selectedIcon: Icon(Icons.inventory_2),
+              activeIcon: Icon(Icons.inventory_2),
               label: 'Inventory'),
-          NavigationDestination(
+          BottomNavigationBarItem(
               icon: Icon(Icons.point_of_sale_outlined),
-              selectedIcon: Icon(Icons.point_of_sale),
+              activeIcon: Icon(Icons.point_of_sale),
               label: 'Sales'),
-          NavigationDestination(
-              icon: Icon(Icons.schedule_outlined),
-              selectedIcon: Icon(Icons.schedule),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.timer_outlined),
+              activeIcon: Icon(Icons.timer),
               label: 'Expiry'),
-          NavigationDestination(
+          BottomNavigationBarItem(
               icon: Icon(Icons.bar_chart_outlined),
-              selectedIcon: Icon(Icons.bar_chart),
+              activeIcon: Icon(Icons.bar_chart),
               label: 'Reports'),
         ],
       ),
@@ -69,9 +72,9 @@ class _DashboardHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    final med = context.watch<MedicineProvider>();
+    final medicines = context.watch<MedicineProvider>();
     final sales = context.watch<SalesProvider>();
+    final user = context.watch<AuthProvider>().user;
 
     final todaySales = sales.sales.where((s) {
       final now = DateTime.now();
@@ -81,119 +84,93 @@ class _DashboardHome extends StatelessWidget {
     }).toList();
 
     final todayRevenue =
-    todaySales.fold(0.0, (sum, s) => sum + s.grandTotal);
+    todaySales.fold<double>(0, (sum, s) => sum + s.grandTotal);
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Dashboard',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            Text('Welcome, ${auth.user?.username ?? ''}',
-                style: const TextStyle(fontSize: 12)),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('Welcome, ${user?.username ?? ''}',
+                style:
+                const TextStyle(fontSize: 12, fontWeight: FontWeight.w300)),
           ],
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            tooltip: 'Logout',
             onPressed: () {
               context.read<AuthProvider>().logout();
               Navigator.pushReplacement(context,
                   MaterialPageRoute(builder: (_) => const LoginScreen()));
             },
-          ),
+          )
         ],
       ),
-      body: med.medicines.isEmpty
-          ? const LoadingWidget(message: 'Loading data...')
-          : RefreshIndicator(
-        onRefresh: () async {},
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Stats grid
+            // Stat Cards
             GridView.count(
               crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 1.4,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: 1.2,
               children: [
                 StatCard(
-                  title: 'Total Stock',
-                  value: med.medicines.length.toString(),
+                  title: 'Total Medicines',
+                  value: '${medicines.medicines.length}',
                   icon: Icons.medication,
-                  color: Colors.teal,
+                  color: AppColors.primary,
                 ),
                 StatCard(
                   title: 'Low Stock',
-                  value: med.lowStock.length.toString(),
+                  value: '${medicines.lowStock.length}',
                   icon: Icons.warning_amber,
-                  color: Colors.orange,
+                  color: AppColors.warning,
                 ),
                 StatCard(
                   title: 'Near Expiry',
-                  value: med.nearExpiry.length.toString(),
-                  icon: Icons.schedule,
-                  color: Colors.deepOrange,
+                  value: '${medicines.nearExpiry.length}',
+                  icon: Icons.timer_outlined,
+                  color: AppColors.danger,
                 ),
                 StatCard(
-                  title: "Today's Sales",
-                  value: '₦${todayRevenue.toStringAsFixed(0)}',
+                  title: "Today's Revenue",
+                  value: '৳${todayRevenue.toStringAsFixed(0)}',
                   icon: Icons.attach_money,
-                  color: Colors.green,
+                  color: AppColors.secondary,
                 ),
               ],
             ),
+
             const SizedBox(height: 24),
 
-            // Low stock alerts
-            if (med.lowStock.isNotEmpty) ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Low Stock Alerts',
-                      style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold)),
-                  Text('${med.lowStock.length} items',
-                      style: TextStyle(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
-                          fontSize: 13)),
-                ],
+            // Low Stock Section
+            const Text('Low Stock Medicines',
+                style:
+                TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            medicines.lowStock.isEmpty
+                ? const Card(
+              child: ListTile(
+                leading: Icon(Icons.check_circle,
+                    color: AppColors.secondary),
+                title: Text('All medicines are well stocked'),
               ),
-              const SizedBox(height: 12),
-              ...med.lowStock.take(5).map(
-                    (m) => LowStockCard(medicine: m),
-              ),
-            ],
-
-            // Near expiry alerts
-            if (med.nearExpiry.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Near Expiry',
-                      style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold)),
-                  Text('${med.nearExpiry.length} items',
-                      style: TextStyle(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
-                          fontSize: 13)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ...med.nearExpiry.take(5).map(
-                    (m) => LowStockCard(medicine: m),
-              ),
-            ],
+            )
+                : Column(
+              children: medicines.lowStock
+                  .map((m) => LowStockCard(medicine: m))
+                  .toList(),
+            ),
           ],
         ),
       ),

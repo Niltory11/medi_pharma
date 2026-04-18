@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
 import '../../providers/medicine_provider.dart';
+import '../../core/constants/app_colors.dart';
 import '../../models/medicine_model.dart';
-import '../../widgets/common/loading_widget.dart';
+import '../../core/utils/date_utils.dart';
 import 'add_medicine_screen.dart';
-import '../../screens/inventory/medicine_detail_screen.dart';
+import 'medicine_detail_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -15,90 +15,63 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen> {
+  final _searchController = TextEditingController();
   String _query = '';
-  String _filter = 'All';
-  final _filters = ['All', 'Low Stock', 'Near Expiry', 'Expired'];
-
-  List<Medicine> _filtered(MedicineProvider prov) {
-    List<Medicine> list = _query.isNotEmpty ? prov.search(_query) : prov.medicines;
-    switch (_filter) {
-      case 'Low Stock':
-        list = list.where((m) => m.isLowStock).toList();
-        break;
-      case 'Near Expiry':
-        list = list.where((m) => m.isNearExpiry).toList();
-        break;
-      case 'Expired':
-        list = list.where((m) => m.isExpired).toList();
-        break;
-    }
-    return list;
-  }
 
   @override
   Widget build(BuildContext context) {
-    final prov = context.watch<MedicineProvider>();
-    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
-    final list = _filtered(prov);
+    final provider = context.watch<MedicineProvider>();
+    final list =
+    _query.isEmpty ? provider.medicines : provider.search(_query);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Inventory',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Inventory'),
         actions: [
-          if (isAdmin)
-            IconButton(
-              icon: const Icon(Icons.add),
-              tooltip: 'Add Medicine',
-              onPressed: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const AddMedicineScreen())),
-            ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const AddMedicineScreen())),
+          )
         ],
       ),
       body: Column(
         children: [
+          // Search Bar
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            padding: const EdgeInsets.all(12),
             child: TextField(
+              controller: _searchController,
+              onChanged: (v) => setState(() => _query = v),
               decoration: InputDecoration(
                 hintText: 'Search medicines...',
                 prefixIcon: const Icon(Icons.search),
+                suffixIcon: _query.isNotEmpty
+                    ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _query = '');
+                  },
+                )
+                    : null,
                 border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none),
+                    borderRadius: BorderRadius.circular(12)),
                 filled: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                fillColor: Colors.white,
               ),
-              onChanged: (v) => setState(() => _query = v),
             ),
           ),
-          SizedBox(
-            height: 44,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              itemCount: _filters.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, i) {
-                final selected = _filter == _filters[i];
-                return ChoiceChip(
-                  label: Text(_filters[i]),
-                  selected: selected,
-                  onSelected: (_) => setState(() => _filter = _filters[i]),
-                );
-              },
-            ),
-          ),
+
+          // Medicine List
           Expanded(
-            child: prov.medicines.isEmpty
-                ? const LoadingWidget(message: 'Loading medicines...')
-                : list.isEmpty
+            child: list.isEmpty
                 ? const Center(child: Text('No medicines found'))
                 : ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               itemCount: list.length,
               itemBuilder: (_, i) =>
-                  _MedicineCard(medicine: list[i], isAdmin: isAdmin),
+                  _MedicineCard(medicine: list[i]),
             ),
           ),
         ],
@@ -109,71 +82,55 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
 class _MedicineCard extends StatelessWidget {
   final Medicine medicine;
-  final bool isAdmin;
+  const _MedicineCard({required this.medicine});
 
-  const _MedicineCard({required this.medicine, required this.isAdmin});
-
-  Color _statusColor() {
-    if (medicine.isExpired) return Colors.red;
-    if (medicine.isNearExpiry) return Colors.deepOrange;
-    if (medicine.isLowStock) return Colors.orange;
-    return Colors.green;
+  Color get _expiryColor {
+    if (medicine.isExpired) return AppColors.expired;
+    if (medicine.isNearExpiry) return AppColors.nearExpiry;
+    return AppColors.healthy;
   }
 
   @override
   Widget build(BuildContext context) {
-    final color = _statusColor();
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        contentPadding:
-        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(Icons.medication, color: color),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => MedicineDetailScreen(medicine: medicine)),
+        ),
+        leading: CircleAvatar(
+          backgroundColor: AppColors.primary.withOpacity(0.1),
+          child:
+          const Icon(Icons.medication, color: AppColors.primary),
         ),
         title: Text(medicine.name,
             style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text('${medicine.category} • Qty: ${medicine.quantity}'),
+        subtitle: Text(
+            '${medicine.category} • Exp: ${AppDateUtils.format(medicine.expiryDate)}'),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text('₦${medicine.price.toStringAsFixed(2)}',
-                style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('৳${medicine.price.toStringAsFixed(2)}',
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary)),
             Container(
-              margin: const EdgeInsets.only(top: 4),
               padding:
               const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(20),
+                color: _expiryColor.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Text(
-                medicine.isExpired
-                    ? 'Expired'
-                    : medicine.isNearExpiry
-                    ? 'Near Expiry'
-                    : medicine.isLowStock
-                    ? 'Low Stock'
-                    : 'OK',
-                style:
-                TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600),
-              ),
+              child: Text('${medicine.quantity} pcs',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: _expiryColor,
+                      fontWeight: FontWeight.w600)),
             ),
           ],
-        ),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => MedicineDetailsScreen(
-                  medicine: medicine, isAdmin: isAdmin)),
         ),
       ),
     );
