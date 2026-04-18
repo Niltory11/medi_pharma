@@ -35,7 +35,8 @@ class CartScreen extends StatelessWidget {
                 size: 80, color: Colors.grey),
             SizedBox(height: 12),
             Text('Cart is empty',
-                style: TextStyle(color: Colors.grey, fontSize: 16)),
+                style:
+                TextStyle(color: Colors.grey, fontSize: 16)),
           ],
         ),
       )
@@ -53,12 +54,12 @@ class CartScreen extends StatelessWidget {
                         style: const TextStyle(
                             fontWeight: FontWeight.w600)),
                     subtitle: Text(
-                        '৳${item.medicine.price.toStringAsFixed(2)} × ${item.quantity}'),
+                        'BDT ${item.medicine.price.toStringAsFixed(2)} x ${item.quantity}'),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                            '৳${item.total.toStringAsFixed(2)}',
+                            'BDT ${item.total.toStringAsFixed(2)}',
                             style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.primary)),
@@ -97,7 +98,7 @@ class CartScreen extends StatelessWidget {
                             fontSize: 18,
                             fontWeight: FontWeight.bold)),
                     Text(
-                        '৳${cart.cartTotal.toStringAsFixed(2)}',
+                        'BDT ${cart.cartTotal.toStringAsFixed(2)}',
                         style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -108,12 +109,18 @@ class CartScreen extends StatelessWidget {
                 CustomButton(
                   label: 'Checkout & Print Receipt',
                   onPressed: () async {
-                    final items = List.from(cart.cart);
+                    // Snapshot cart before clearing
+                    final cartItems = List.from(cart.cart);
                     final total = cart.cartTotal;
-                    await cart.checkout(user?.username ?? 'staff');
+                    final soldBy = user?.username ?? 'staff';
+
+                    // Checkout (saves sale + deducts qty)
+                    await cart.checkout(soldBy);
+
                     if (context.mounted) {
+                      // Generate PDF after checkout
                       await PdfUtils.generateReceipt(
-                          items, total, user?.username ?? 'staff');
+                          cartItems, total, soldBy);
                       Navigator.pop(context);
                     }
                   },
